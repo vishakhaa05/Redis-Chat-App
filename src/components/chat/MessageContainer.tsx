@@ -21,10 +21,11 @@ const MessageContainer = () => {
 		<div className='flex flex-col justify-between w-full h-full'>
 			<ChatTopBar />
 
-			<div className='w-full overflow-y-auto overflow-x-hidden h-full flex flex-col'>
+			<div className='w-full flex-1 min-h-0 overflow-hidden flex flex-col'>
 				<MessageList />
-				<ChatBottomBar />
 			</div>
+
+			<ChatBottomBar />
 		</div>
 	);
 };

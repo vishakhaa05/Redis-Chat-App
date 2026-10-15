@@ -51,6 +51,7 @@ export async function sendMessageAction({ content, messageType, receiverId }: Se
 
 	// Create the message hash
 	await redis.hset(messageId, {
+		id: messageId,
 		senderId,
 		content,
 		timestamp,
@@ -62,23 +63,31 @@ export async function sendMessageAction({ content, messageType, receiverId }: Se
 	const channelName = `${senderId}__${receiverId}`.split("__").sort().join("__");
 
 	await pusherServer?.trigger(channelName, "newMessage", {
-		message: { senderId, content, timestamp, messageType },
+		message: { id: messageId, senderId, content, timestamp, messageType },
 	});
 
 	return { success: true, conversationId, messageId };
 }
 
 export async function getMessages(selectedUserId: string, currentUserId: string) {
-	// conversation:kp_87f4a115d5f34587940cdee58885a58b:kp_a6bc2324e26548fcb5c19798f6459814:messages
-
 	const conversationId = `conversation:${[selectedUserId, currentUserId].sort().join(":")}`;
-	const messageIds = await redis.zrange(`${conversationId}:messages`, 0, -1);
+	const messageIds = await redis.zrange<string[]>(`${conversationId}:messages`, 0, -1);
 
-	if (messageIds.length === 0) return [];
+	if (!messageIds || messageIds.length === 0) return [];
 
 	const pipeline = redis.pipeline();
-	messageIds.forEach((messageId) => pipeline.hgetall(messageId as string));
-	const messages = (await pipeline.exec()) as Message[];
+	messageIds.forEach((messageId: unknown) => {
+		let id = messageId as string;
+		if (typeof messageId === "string" && messageId.startsWith('"')) {
+			try {
+				id = JSON.parse(messageId);
+			} catch {
+				id = messageId;
+			}
+		}
+		pipeline.hgetall(id);
+	});
+	const results = (await pipeline.exec()) as Message[];
 
-	return messages;
+	return results ? results.filter((m) => m && Object.keys(m).length > 0) : [];
 }

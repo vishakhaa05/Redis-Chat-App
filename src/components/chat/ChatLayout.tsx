@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "../ui/resizable";
+import { usePanelRef } from "react-resizable-panels";
 import { cn } from "@/lib/utils";
 import Sidebar from "../Sidebar";
 import MessageContainer from "./MessageContainer";
@@ -9,59 +10,88 @@ import { useSelectedUser } from "@/store/useSelectedUser";
 
 interface ChatLayoutProps {
 	defaultLayout: number[] | undefined;
+	defaultCollapsed?: boolean;
 	users: User[];
 }
-const ChatLayout = ({ defaultLayout = [320, 480], users }: ChatLayoutProps) => {
-	const [isCollapsed, setIsCollapsed] = useState(false);
+const ChatLayout = ({ defaultLayout, defaultCollapsed = false, users }: ChatLayoutProps) => {
+	const [isCollapsed, setIsCollapsed] = useState(defaultCollapsed);
 	const [isMobile, setIsMobile] = useState(false);
 	const { selectedUser } = useSelectedUser();
+	const sidebarPanelRef = usePanelRef();
+
+	const handleToggleCollapse = () => {
+		if (sidebarPanelRef.current) {
+			if (isCollapsed || sidebarPanelRef.current.isCollapsed()) {
+				sidebarPanelRef.current.expand();
+				setIsCollapsed(false);
+				document.cookie = `react-resizable-panels:collapsed=false; path=/;`;
+			} else {
+				sidebarPanelRef.current.collapse();
+				setIsCollapsed(true);
+				document.cookie = `react-resizable-panels:collapsed=true; path=/;`;
+			}
+		} else {
+			const next = !isCollapsed;
+			setIsCollapsed(next);
+			document.cookie = `react-resizable-panels:collapsed=${next}; path=/;`;
+		}
+	};
 
 	useEffect(() => {
 		const checkScreenWidth = () => {
-			setIsMobile(window.innerWidth <= 768);
+			const mobile = window.innerWidth <= 768;
+			setIsMobile(mobile);
+			if (mobile) {
+				setIsCollapsed(true);
+				if (sidebarPanelRef.current) {
+					sidebarPanelRef.current.collapse();
+				}
+			}
 		};
 
-		// Initial check
 		checkScreenWidth();
-
-		// Event listener for screen width changes
 		window.addEventListener("resize", checkScreenWidth);
-
-		// Cleanup the event listener on component unmount
 		return () => {
 			window.removeEventListener("resize", checkScreenWidth);
 		};
-	}, []);
+	}, [sidebarPanelRef]);
+
+	useEffect(() => {
+		if (defaultCollapsed && sidebarPanelRef.current) {
+			sidebarPanelRef.current.collapse();
+		}
+	}, [defaultCollapsed, sidebarPanelRef]);
 
 	return (
 		<ResizablePanelGroup
-			//direction='horizontal'
 			className='h-full items-stretch bg-background rounded-lg'
-			/*onLayout={(sizes: number[]) => {
-				document.cookie = `react-resizable-panels:layout=${JSON.stringify(sizes)}; `;
-			}}*/
+			onLayoutChanged={(sizes) => {
+				document.cookie = `react-resizable-panels:layout=${JSON.stringify(sizes)}; path=/;`;
+			}}
 		>
 			<ResizablePanel
-				defaultSize={defaultLayout[0]}
-				collapsedSize={8}
+				id='sidebar'
+				panelRef={sidebarPanelRef}
+				defaultSize={isCollapsed ? "80px" : "28%"}
+				collapsedSize='80px'
 				collapsible={true}
-				minSize={50}
-				maxSize={200}
-				/*onCollapse={() => {
-					setIsCollapsed(true);
-					document.cookie = `react-resizable-panels:collapsed=true;`;
+				minSize={isMobile ? "0px" : "200px"}
+				maxSize='450px'
+				onResize={(panelSize) => {
+					const collapsed = sidebarPanelRef.current
+						? sidebarPanelRef.current.isCollapsed()
+						: (typeof panelSize === "number" ? panelSize : panelSize?.inPixels ?? 200) <= 85;
+					setIsCollapsed(collapsed);
+					document.cookie = `react-resizable-panels:collapsed=${collapsed}; path=/;`;
 				}}
-				onExpand={() => {
-					setIsCollapsed(false);
-					document.cookie = `react-resizable-panels:collapsed=false;`;
-				}}*/
-				className={cn(isCollapsed && "min-w-[80px] transition-all duration-300 ease-in-out")}>
-			    <Sidebar isCollapsed={isCollapsed} users={users}/>
-            </ResizablePanel>
+				className={cn(isCollapsed && "min-w-[80px] transition-all duration-300 ease-in-out")}
+			>
+				<Sidebar isCollapsed={isCollapsed || isMobile} users={users} onToggleCollapse={handleToggleCollapse} />
+			</ResizablePanel>
 
-			<ResizableHandle withHandle />
+			<ResizableHandle withHandle onDoubleClick={handleToggleCollapse} />
 
-			<ResizablePanel defaultSize={defaultLayout[1]} minSize={30}>
+			<ResizablePanel id='main' defaultSize='72%' minSize='300px'>
 				{!selectedUser && (
 					<div className='flex justify-center items-center h-full w-full px-10'>
 						<div className='flex flex-col justify-center items-center gap-4'>

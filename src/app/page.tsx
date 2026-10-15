@@ -26,18 +26,23 @@ async function getUsers(): Promise<User[]> {
 	const results = (await pipeline.exec()) as User[];
 
 	const users: User[] = [];
-	for (const user of results) {
-		// exclude the current user from the list of users in the sidebar
-		if (user.id !== currentUser?.id) {
-			users.push(user);
+	if (results) {
+		for (const user of results) {
+			if (user && user.id && user.id !== currentUser?.id) {
+				users.push(user);
+			}
 		}
 	}
 	return users;
 }
 
 export default async function Home() {
-	const layout = (await cookies()).get("react-resizable-panels:layout");
+	const cookieStore = await cookies();
+	const layout = cookieStore.get("react-resizable-panels:layout");
 	const defaultLayout = layout ? JSON.parse(layout.value) : undefined;
+
+	const collapsed = cookieStore.get("react-resizable-panels:collapsed");
+	const defaultCollapsed = collapsed ? JSON.parse(collapsed.value) : undefined;
 
 	const { isAuthenticated } = getKindeServerSession();
 	if (!(await isAuthenticated())) return redirect("/auth");
@@ -56,7 +61,7 @@ export default async function Home() {
 			/>
 
 			<div className='z-10 border rounded-lg max-w-5xl w-full min-h-[85vh] text-sm lg:flex'>
-				<ChatLayout defaultLayout={defaultLayout} users={users}/>
+				<ChatLayout defaultLayout={defaultLayout} defaultCollapsed={defaultCollapsed} users={users}/>
 			</div>
 		</main>
 	);

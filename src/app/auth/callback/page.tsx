@@ -4,6 +4,8 @@ import { useQuery } from "@tanstack/react-query";
 import { Loader } from "lucide-react";
 import { useRouter } from "next/navigation";
 
+import { useEffect } from "react";
+
 const Page = () => {
 	const router = useRouter();
 	const { data } = useQuery({
@@ -11,7 +13,9 @@ const Page = () => {
 		queryFn: async () => await checkAuthStatus(),
 	});
 
-	if (data?.success) router.push("/");
+	useEffect(() => {
+		if (data?.success) router.push("/");
+	}, [data, router]);
 
 	return (
 		<div className='mt-20 w-full flex justify-center'>

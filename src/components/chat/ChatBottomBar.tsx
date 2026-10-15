@@ -45,13 +45,31 @@ const ChatBottomBar = () => {
 	const [playNotificationSound] = useSound("/sounds/notification.mp3");
 
 	const { mutate: sendMessage, isPending } = useMutation({
-		mutationFn: sendMessageAction
+		mutationFn: sendMessageAction,
+		onSuccess: () => {
+			if (selectedUser?.id) {
+				queryClient.invalidateQueries({ queryKey: ["messages", selectedUser.id] });
+			}
+		},
 	});
 
 	const handleSendMessage = () => {
-		if (!message.trim()) return;
+		if (!message.trim() || !selectedUser?.id) return;
 
-		sendMessage({ content: message, messageType: "text", receiverId: selectedUser?.id! });
+		const currentContent = message.trim();
+		const currentTimestamp = Date.now();
+		const optimisticMessage: Message = {
+			id: currentTimestamp,
+			senderId: currentUser?.id || "",
+			content: currentContent,
+			messageType: "text",
+		};
+
+		queryClient.setQueryData(["messages", selectedUser.id], (oldMessages: Message[] | undefined) => {
+			return [...(oldMessages || []), optimisticMessage];
+		});
+
+		sendMessage({ content: currentContent, messageType: "text", receiverId: selectedUser.id });
 		setMessage("");
 
 		textAreaRef.current?.focus();
@@ -70,29 +88,39 @@ const ChatBottomBar = () => {
 	};
 
 	useEffect(() => {
-		const channelName = `${currentUser?.id}__${selectedUser?.id}`.split("__").sort().join("__");
+		if (!currentUser?.id || !selectedUser?.id) return;
+		const channelName = `${currentUser.id}__${selectedUser.id}`.split("__").sort().join("__");
 		const channel = pusherClient?.subscribe(channelName);
 
 		const handleNewMessage = (data: { message: Message }) => {
-			queryClient.setQueryData(["messages", selectedUser?.id], (oldMessages: Message[]) => {
-				return [...oldMessages, data.message];
+			queryClient.setQueryData(["messages", selectedUser.id], (oldMessages: Message[] | undefined) => {
+				const existing = oldMessages || [];
+				const isDuplicate = existing.some(
+					(m: any) =>
+						(data.message.id && m.id === data.message.id) ||
+						(m.senderId === data.message.senderId &&
+							m.content === data.message.content &&
+							Math.abs((m.timestamp || 0) - ((data.message as any).timestamp || 0)) < 1000)
+				);
+				if (isDuplicate) return existing;
+				return [...existing, data.message];
 			});
 
-			if (soundEnabled && data.message.senderId !== currentUser?.id) {
+			if (soundEnabled && data.message.senderId !== currentUser.id) {
 				playNotificationSound();
 			}
 		};
 
-		channel.bind("newMessage", handleNewMessage);
+		channel?.bind("newMessage", handleNewMessage);
 
 		return () => {
-			channel.unbind("newMessage", handleNewMessage);
-			pusherClient.unsubscribe(channelName);
+			channel?.unbind("newMessage", handleNewMessage);
+			pusherClient?.unsubscribe(channelName);
 		};
 	}, [currentUser?.id, selectedUser?.id, queryClient, playNotificationSound, soundEnabled]);
 
 	return (
-		<div className='p-2 flex justify-between w-full items-center gap-2'>
+		<div className='p-3 flex justify-between w-full items-center gap-2 border-t bg-background'>
 			{!message.trim() && (
 				<CldUploadWidget
 					signatureEndpoint={"/api/sign-cloudinary-params"}
@@ -103,30 +131,51 @@ const ChatBottomBar = () => {
 				>
 					{({ open }) => {
 						return (
-							<ImageIcon
-								size={20}
+							<Button
+								variant='ghost'
+								size='icon'
+								type='button'
 								onClick={() => open()}
-								className='cursor-pointer text-muted-foreground'
-							/>
+								className='h-9 w-9 shrink-0 text-muted-foreground hover:text-foreground'
+							>
+								<ImageIcon size={20} />
+							</Button>
 						);
 					}}
 				</CldUploadWidget>
 			)}
-			<Dialog open={!!imgUrl}>
+			<Dialog open={!!imgUrl} onOpenChange={(open) => { if (!open) setImgUrl(""); }}>
 				<DialogContent>
 					<DialogHeader>
 						<DialogTitle>Image Preview</DialogTitle>
 					</DialogHeader>
 					<div className='flex justify-center items-center relative h-96 w-full mx-auto'>
-						<Image src={imgUrl} alt='Image Preview' fill className='object-contain' />
+						{imgUrl ? (
+							<Image src={imgUrl} alt='Image Preview' fill className='object-contain' />
+						) : null}
 					</div>
 
 					<DialogFooter>
 						<Button
 							type='submit'
 							onClick={() => {
-								sendMessage({ content: imgUrl, messageType: "image", receiverId: selectedUser?.id! });
-								setImgUrl("");
+								if (selectedUser?.id && imgUrl) {
+									const currentImg = imgUrl;
+									const currentTimestamp = Date.now();
+									const optimisticMessage: Message = {
+										id: currentTimestamp,
+										senderId: currentUser?.id || "",
+										content: currentImg,
+										messageType: "image",
+									};
+
+									queryClient.setQueryData(["messages", selectedUser.id], (oldMessages: Message[] | undefined) => {
+										return [...(oldMessages || []), optimisticMessage];
+									});
+
+									sendMessage({ content: currentImg, messageType: "image", receiverId: selectedUser.id });
+									setImgUrl("");
+								}
 							}}
 						>
 							Send
@@ -137,25 +186,25 @@ const ChatBottomBar = () => {
 
 			<AnimatePresence>
 				<motion.div
+					key='chat-input-wrapper'
 					layout
 					initial={{ opacity: 0, scale: 1 }}
 					animate={{ opacity: 1, scale: 1 }}
 					exit={{ opacity: 0, scale: 1 }}
 					transition={{
-						opacity: { duration: 0.5 },
+						opacity: { duration: 0.2 },
 						layout: {
 							type: "spring",
 							bounce: 0.15,
 						},
 					}}
-					className='w-full relative'
+					className='w-full relative flex items-center'
 				>
 					<Textarea
 						autoComplete='off'
 						placeholder='Aa'
 						rows={1}
-						className='w-full border rounded-full flex items-center h-9 resize-none overflow-hidden
-						bg-background min-h-0'
+						className='w-full border rounded-full flex items-center h-9 min-h-[36px] max-h-24 resize-none overflow-hidden bg-background pl-4 pr-10 py-1.5 text-sm leading-normal focus-visible:ring-1'
 						value={message}
 						onKeyDown={handleKeyDown}
 						onChange={(e) => {
@@ -164,10 +213,10 @@ const ChatBottomBar = () => {
 						}}
 						ref={textAreaRef}
 					/>
-					<div className='absolute right-2 bottom-0.5'>
+					<div className='absolute right-2 flex items-center'>
 						<EmojiPicker
 							onChange={(emoji) => {
-								setMessage(message + emoji);
+								setMessage((prev) => prev + emoji);
 								if (textAreaRef.current) {
 									textAreaRef.current.focus();
 								} 
@@ -178,28 +227,40 @@ const ChatBottomBar = () => {
 
 				{message.trim() ? (
 					<Button
-						className='h-9 w-9 dark:bg-muted dark:text-muted-foreground dark:hover:bg-muted dark:hover:text-white shrink-0'
+						key='send-button'
+						className='h-9 w-9 shrink-0'
 						variant={"ghost"}
 						size={"icon"}
 						onClick={handleSendMessage}
 					>
-						<SendHorizontal size={20} className='text-muted-foreground' />
+						<SendHorizontal size={20} className='text-muted-foreground hover:text-foreground' />
 					</Button>
 				) : (
 					<Button
-						className='h-9 w-9 dark:bg-muted dark:text-muted-foreground dark:hover:bg-muted dark:hover:text-white shrink-0'
+						key='thumbs-up-button'
+						className='h-9 w-9 shrink-0'
 						variant={"ghost"}
 						size={"icon"}
+						disabled={isPending}
+						onClick={() => {
+							if (selectedUser?.id) {
+								const currentTimestamp = Date.now();
+								const optimisticMessage: Message = {
+									id: currentTimestamp,
+									senderId: currentUser?.id || "",
+									content: "👍",
+									messageType: "text",
+								};
+
+								queryClient.setQueryData(["messages", selectedUser.id], (oldMessages: Message[] | undefined) => {
+									return [...(oldMessages || []), optimisticMessage];
+								});
+
+								sendMessage({ content: "👍", messageType: "text", receiverId: selectedUser.id });
+							}
+						}}
 					>
-						{!isPending && (
-							<ThumbsUp
-								size={20}
-								className='text-muted-foreground'
-								onClick={() => {
-									sendMessage({ content: "👍", messageType: "text", receiverId: selectedUser?.id! });
-								}}
-							/>
-						)}
+						{!isPending && <ThumbsUp size={20} className='text-muted-foreground hover:text-foreground' />}
 						{isPending && <Loader size={20} className='animate-spin' />}
 					</Button>
 				)}

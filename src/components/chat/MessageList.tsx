@@ -1,6 +1,6 @@
 import { cn } from "@/lib/utils";
 import { AnimatePresence, motion } from "framer-motion";
-import { Avatar, AvatarImage } from "../ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "../ui/avatar";
 import { useSelectedUser } from "@/store/useSelectedUser";
 import { useKindeBrowserClient } from "@kinde-oss/kinde-auth-nextjs";
 import { useQuery } from "@tanstack/react-query";
@@ -37,7 +37,7 @@ const MessageList = () => {
 			<AnimatePresence>
 				 {!isMessagesLoading && messages?.map((message, index) => (
 						<motion.div
-							key={index}
+							key={(message as any).id || (message as any).timestamp || `msg-${index}`}
 							layout
 							initial={{ opacity: 0, scale: 1, y: 50, x: 0 }}
 							animate={{ opacity: 1, scale: 1, y: 0, x: 0 }}
@@ -51,8 +51,7 @@ const MessageList = () => {
 								},
 							}}
 							style={{
-								originX: 0.5,
-								originY: 0.5,
+								transformOrigin: "center",
 							}}
 							className={cn(
 								"flex flex-col gap-2 p-4 whitespace-pre-wrap",
@@ -63,10 +62,11 @@ const MessageList = () => {
 								{message.senderId === selectedUser?.id && (
 									<Avatar className='flex justify-center items-center'>
 										<AvatarImage
-											src={selectedUser?.image}
+											src={selectedUser?.image || "/user-placeholder.png"}
 											alt='User Image'
 											className='border-2 border-white rounded-full'
 										/>
+										<AvatarFallback>{selectedUser?.name?.[0] || "?"}</AvatarFallback>
 									</Avatar>
 								)}
 								{message.messageType === "text" ? (
@@ -86,17 +86,18 @@ const MessageList = () => {
 											alt='User Image'
 											className='border-2 border-white rounded-full'
 										/>
+										<AvatarFallback>{currentUser?.given_name?.[0] || "?"}</AvatarFallback>
 									</Avatar>
 								)}
 							</div>
 						</motion.div>
 					))}
 				 {isMessagesLoading && (
-					<>
+					<motion.div key='skeletons-loading' className='flex flex-col gap-4 p-4'>
 						<MessageSkeleton />
 						<MessageSkeleton />
 						<MessageSkeleton />
-					</>
+					</motion.div>
 				)}
 
 			</AnimatePresence>

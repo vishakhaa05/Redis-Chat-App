@@ -4,7 +4,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "./ui/t
 import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
 import { Button } from "./ui/button";
 import { cn } from "@/lib/utils";
-import { LogOut } from "lucide-react";
+import { LogOut, PanelLeftClose, PanelLeftOpen } from "lucide-react";
 import useSound from "use-sound";
 import { usePreferences } from "@/store/usePreferences";
 import { LogoutLink } from "@kinde-oss/kinde-auth-nextjs/components";
@@ -14,9 +14,10 @@ import { useKindeBrowserClient } from "@kinde-oss/kinde-auth-nextjs";
 interface SidebarProps {
 	isCollapsed: boolean;
 	users: User[];
+	onToggleCollapse?: () => void;
 }
 
-const Sidebar = ({ isCollapsed, users }: SidebarProps) => {
+const Sidebar = ({ isCollapsed, users, onToggleCollapse }: SidebarProps) => {
 	const [playClickSound] = useSound("/sounds/mouse-click.mp3");
 	const { soundEnabled } = usePreferences();
 	const { setSelectedUser, selectedUser } = useSelectedUser();
@@ -24,13 +25,41 @@ const Sidebar = ({ isCollapsed, users }: SidebarProps) => {
 	const { user } = useKindeBrowserClient();
 
 	return (
-		<div className='group relative flex flex-col h-full gap-4 p-2 data-[collapsed=true]:p-2  max-h-full overflow-auto bg-background'>
-			{!isCollapsed && (
+		<div
+			data-collapsed={isCollapsed}
+			className='group relative flex flex-col h-full gap-4 p-2 data-[collapsed=true]:p-2 max-h-full overflow-auto bg-background'
+		>
+			{!isCollapsed ? (
 				<div className='flex justify-between p-2 items-center'>
 					<div className='flex gap-2 items-center text-2xl'>
 						<p className='font-medium'>Chats</p>
 					</div>
+					{onToggleCollapse && (
+						<Button
+							variant='ghost'
+							size='icon'
+							className='h-8 w-8 text-muted-foreground hover:text-foreground'
+							onClick={onToggleCollapse}
+							title='Collapse sidebar'
+						>
+							<PanelLeftClose className='h-4 w-4' />
+						</Button>
+					)}
 				</div>
+			) : (
+				onToggleCollapse && (
+					<div className='flex justify-center p-1'>
+						<Button
+							variant='ghost'
+							size='icon'
+							className='h-8 w-8 text-muted-foreground hover:text-foreground'
+							onClick={onToggleCollapse}
+							title='Expand sidebar'
+						>
+							<PanelLeftOpen className='h-4 w-4' />
+						</Button>
+					</div>
+				)
 			)}
 
 			<ScrollArea className='gap-2 px-2 group-[[data-collapsed=true]]:justify-center group-[[data-collapsed=true]]:px-2'>
@@ -51,13 +80,13 @@ const Sidebar = ({ isCollapsed, users }: SidebarProps) => {
 												alt='User Image'
 												className='border-2 border-white rounded-full w-10 h-10'
 											/>
-											<AvatarFallback>{user.name[0]}</AvatarFallback>
+											<AvatarFallback>{user.name?.[0] || user.email?.[0] || "?"}</AvatarFallback>
 										</Avatar>
-										<span className='sr-only'>{user.name}</span>
+										<span className='sr-only'>{user.name || user.email}</span>
 									</div>
 								</TooltipTrigger>
 								<TooltipContent side='right' className='flex items-center gap-4'>
-									{user.name}
+									{user.name || user.email}
 								</TooltipContent>
 							</Tooltip>
 						</TooltipProvider>
@@ -82,10 +111,10 @@ const Sidebar = ({ isCollapsed, users }: SidebarProps) => {
 									alt={"User image"}
 									className='w-10 h-10'
 								/>
-								<AvatarFallback>{user.name[0]}</AvatarFallback>
+								<AvatarFallback>{user.name?.[0] || user.email?.[0] || "?"}</AvatarFallback>
 							</Avatar>
 							<div className='flex flex-col max-w-28'>
-								<span>{user.name}</span>
+								<span>{user.name || user.email}</span>
 							</div>
 						</Button>
 					)
@@ -103,9 +132,10 @@ const Sidebar = ({ isCollapsed, users }: SidebarProps) => {
 									referrerPolicy='no-referrer'
 									className='w-8 h-8 border-2 border-white rounded-full'
 								/>
+								<AvatarFallback>{user?.given_name?.[0] || user?.email?.[0] || "?"}</AvatarFallback>
 							</Avatar>
 							<p className='font-bold'>
-								{user?.given_name} {user?.family_name}
+								{[user?.given_name, user?.family_name].filter(Boolean).join(" ") || user?.email || "My Account"}
 							</p>
 						</div>
 					)}

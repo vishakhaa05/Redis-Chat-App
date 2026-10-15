@@ -14,15 +14,15 @@ export async function checkAuthStatus() {
 
 	const existingUser = await redis.hgetall(userId);
 
-	// sign up case: bc user is visiting our platform for the first time
 	if (!existingUser || Object.keys(existingUser).length === 0) {
 		const imgIsNull = user.picture?.includes("gravatar");
-		const image = imgIsNull ? "" : user.picture;
+		const image = imgIsNull ? "" : (user.picture || "");
+		const name = [user.given_name, user.family_name].filter(Boolean).join(" ").trim() || user.email?.split("@")[0] || "User";
 
 		await redis.hset(userId, {
 			id: user.id,
-			email: user.email,
-			name: `${user.given_name} ${user.family_name}`,
+			email: user.email || "",
+			name: name,
 			image: image,
 		});
 	}

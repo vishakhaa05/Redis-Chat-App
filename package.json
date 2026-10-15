@@ -14,15 +14,12 @@
     "@emoji-mart/react": "^1.1.1",
     "@kinde-oss/kinde-auth-nextjs": "^2.11.0",
     "@kinde-oss/kinde-node-express": "^1.6.0",
-    "@next/swc-win32-x64-msvc": "^16.2.1",
-    "@tailwindcss/oxide-win32-x64-msvc": "^4.3.3",
     "@tanstack/react-query": "^5.95.2",
     "@upstash/redis": "^1.39.0",
     "class-variance-authority": "^0.7.1",
     "cloudinary": "^2.9.0",
     "clsx": "^2.1.1",
     "framer-motion": "^12.38.0",
-    "lightningcss-win32-x64-msvc": "^1.33.0",
     "lucide-react": "^1.6.0",
     "motion-dom": "^14.2.0",
     "motion-utils": "^14.1.1",
@@ -40,6 +37,11 @@
     "use-sound": "^5.0.0",
     "zustand": "^5.0.15"
   },
+  "optionalDependencies": {
+    "@next/swc-win32-x64-msvc": "^16.2.1",
+    "@tailwindcss/oxide-win32-x64-msvc": "^4.3.3",
+    "lightningcss-win32-x64-msvc": "^1.33.0"
+  },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
@@ -52,3 +54,6 @@
     "typescript": "^5"
   }
 }
+
+
+
